@@ -1,0 +1,593 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template deploys the infrastructure for the GenAIAtTheEdge Workshop
+
+Mappings:
+  EnvironmentConfig:
+    Project:
+      Name: 'GenAIAtTheEdge'
+
+Parameters:
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnetCIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the region
+    Type: String
+    Default: 10.0.0.0/24
+
+  PrivateSubnetCIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the AWS Local Zones or AWS Outposts
+    Type: String
+    Default: 10.0.10.0/24
+
+  LocalZoneAZ:
+    Type: String
+    Description: The Availability Zone ID of the Local Zone (e.g., us-west-2-lax-1a)
+    Default: us-west-2-lax-1a
+
+  DBName:
+    Type: String
+    Default: slmdbtest
+    Description: Database name
+
+  DBInstanceClass:
+    Type: String
+    Default: db.m5.2xlarge
+    Description: Database instance class
+  
+  ClientAndAppInstanceType:
+    Type: String
+    Default: c5.2xlarge
+    Description: Instance type for the Client and the Application
+
+  KeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable RDP access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+
+  SLMInstanceType:
+    Type: String
+    Default: g4dn.12xlarge
+    Description: Instance type for SLM
+
+Resources:
+  #
+  # VPC
+  #
+  VPC:
+    Type: AWS::EC2::VPC
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W60
+            reason: "The VPC Flow Logs is not enabled for this VPC"
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'vpc']]
+  #
+  # Internet Gateway
+  #
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'igw']]
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  #
+  # Subnets
+  #
+  PublicSubnetInTheRegion:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3010
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'region-public-subnet']]
+
+  PrivateSubnetInTheLocalZone:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3010
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnetCIDR
+      AvailabilityZone: !Ref LocalZoneAZ
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'outpost-private-subnet']]
+
+  #
+  # NAT Gateway
+  #
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'nat-gateway-eip']]
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnetInTheRegion
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'nat-gateway']]
+
+  #
+  # Route tables
+  #
+  PublicSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'public-subnet-route-table']]
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicSubnetRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicSubnetRouteTable
+      SubnetId: !Ref PublicSubnetInTheRegion
+
+  PrivateSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'private-subnet-route-table']]
+
+  DefaultPrivateRouteToInternet:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTable
+      SubnetId: !Ref PrivateSubnetInTheLocalZone
+
+  #
+  # RDS database
+  #
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: 
+      cfn_nag:
+        rules_to_suppress:
+          - id: W29
+            reason: "Allow all outbound traffic is required for this use case"
+    Properties:
+      GroupDescription: Security group for PostgreSQL RDS instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          Description: Allow the App to connect to the RDS database
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref PrivateSubnetCIDR
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref PrivateSubnetCIDR
+          Description: Allow outbound PostgreSQL traffic to private subnet CIDR
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for PostgreSQL RDS
+      SubnetIds: 
+        - !Ref PrivateSubnetInTheLocalZone
+
+  MonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: DEMO - Using AWS managed key for secret encryption. Adjust to your policies. 
+    Properties:
+      Description: 'PostgreSQL RDS credentials'
+      KmsKeyId: 'alias/aws/secretsmanager'
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "postgres"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  PostgreSQLInstance:
+      Type: AWS::RDS::DBInstance
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Delete
+      Metadata:
+        checkov:
+          skip:
+            - id: CKV_AWS_157
+              comment: "The RDS database will be deployed in a Local Zone"
+      Properties:
+        DBName: !Ref DBName
+        Engine: postgres
+        EngineVersion: 16.3
+        DBInstanceClass: !Ref DBInstanceClass
+        AllocatedStorage: 20
+        StorageType: gp2
+        MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}:SecretString:username}}'
+        MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}:SecretString:password}}'
+        VPCSecurityGroups:
+          - !Ref DBSecurityGroup
+        DBSubnetGroupName: !Ref DBSubnetGroup
+        PubliclyAccessible: false
+        MultiAZ: false
+        BackupRetentionPeriod: 30
+        StorageEncrypted: true
+        DeletionProtection: true
+        EnableIAMDatabaseAuthentication: true
+        MonitoringInterval: 60
+        MonitoringRoleArn: !GetAtt MonitoringRole.Arn
+        AutoMinorVersionUpgrade: true
+
+  #
+  # Security Groups
+  #
+  #   Client Security Group with no ingress rules
+  #
+  ClientSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: 
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: "Allow all outbound traffic is required to install packages"
+          - id: W29
+            reason: "Allow all outbound traffic is required for this use case"
+    Properties:
+      GroupDescription: Security group for client with no ingress rules
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+        - IpProtocol: tcp
+          FromPort: 5010
+          ToPort: 5040
+          CidrIp: !Ref PrivateSubnetCIDR
+          Description: Allow outbound traffic to the application
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'client-sg']]
+
+  # App Security Group allowing traffic from client-sg
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: 
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: "Allow all outbound traffic is required to install packages"
+          - id: W29
+            reason: "Allow all outbound traffic is required for this use case"
+    Properties:
+      GroupDescription: Security group for app allowing traffic from client-sg
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5010
+          ToPort: 5010
+          SourceSecurityGroupId: !Ref ClientSecurityGroup
+          Description: Allow traffic to access the SimpleChatbot application 
+        - IpProtocol: tcp
+          FromPort: 5020
+          ToPort: 5020
+          SourceSecurityGroupId: !Ref ClientSecurityGroup
+          Description: Allow traffic to access the TwoChatbots application
+        - IpProtocol: tcp
+          FromPort: 5030
+          ToPort: 5030
+          SourceSecurityGroupId: !Ref ClientSecurityGroup
+          Description: Allow traffic to access the Local KnowledgeBase application
+        - IpProtocol: tcp
+          FromPort: 5040
+          ToPort: 5040
+          SourceSecurityGroupId: !Ref ClientSecurityGroup
+          Description: Allow traffic to access the RAG application
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic on port 443
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref PrivateSubnetCIDR
+          Description: Allow outbound traffic to the RDS database
+        - IpProtocol: tcp
+          FromPort: 5050
+          ToPort: 5050
+          CidrIp: !Ref PrivateSubnetCIDR
+          Description: Allow outbound traffic to the RDS database
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref PrivateSubnetCIDR
+          Description: Allow outbound traffic to the LLM instances
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'app-sg']]
+
+  # SLM Security Group allowing traffic from app-sg
+  SLMSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: 
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: "Allow all outbound traffic is required to install packages"
+          - id: W29
+            reason: "Allow all outbound traffic is required for this use case"
+    Properties:
+      GroupDescription: Security group for SLM allowing traffic from app-sg
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5050
+          ToPort: 5050
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: Allow all TCP traffic from app security group (Vector embeddings)
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: Allow all TCP traffic from app security group (Llama.cpp server)
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'llm-sg']]
+
+  #
+  # IAM Roles
+  #
+  EC2SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role for EC2 instances with SSM, S3 on Outposts, and Secrets Manager access
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [secretsmanager:GetSecretValue]
+                Resource: !Ref DBSecret
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'ec2-ssm-role']]
+
+  # Instance Profile for the role
+  EC2SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2SSMRole
+      InstanceProfileName: ec2-ssm-profile
+
+  # IMDSv2
+  IMDSv2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+        LaunchTemplateData:
+          MetadataOptions:
+            HttpEndpoint: enabled
+            HttpPutResponseHopLimit: 1
+            HttpTokens: required
+
+  #
+  # EC2 instance for the Application
+  #
+  AppEC2Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        DisableApiTermination: true
+        InstanceType: !Ref ClientAndAppInstanceType
+        ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64}}'
+        SubnetId: !Ref PrivateSubnetInTheLocalZone
+        IamInstanceProfile: !Ref EC2SSMInstanceProfile
+        SecurityGroupIds: 
+          - !Ref AppSecurityGroup
+        LaunchTemplate:
+          LaunchTemplateId: !Ref IMDSv2LaunchTemplate
+          Version: !GetAtt IMDSv2LaunchTemplate.DefaultVersionNumber
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda  # Root volume for Amazon Linux 2023
+            Ebs:
+              VolumeSize: 30  # Size in GB
+              VolumeType: gp2
+              DeleteOnTermination: true
+              Encrypted: true
+        Tags:
+          - Key: Name
+            Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'Application']]
+
+  #
+  # EC2 instance for the Client
+  #
+  ClientEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: true
+      InstanceType: !Ref ClientAndAppInstanceType
+      KeyName: !Ref KeyPairName
+      ImageId: '{{resolve:ssm:/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base}}'  # Latest Windows Server 2022
+      SubnetId: !Ref PrivateSubnetInTheLocalZone
+      IamInstanceProfile: !Ref EC2SSMInstanceProfile
+      SecurityGroupIds: 
+        - !Ref ClientSecurityGroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref IMDSv2LaunchTemplate
+        Version: !GetAtt IMDSv2LaunchTemplate.DefaultVersionNumber
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1  # Root volume for Windows
+          Ebs:
+            VolumeSize: 30  # Windows needs more space, minimum 30GB recommended
+            VolumeType: gp2
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'Client']]
+
+  #
+  # EC2 instance for the SLM
+  #
+  SLMVectorEmbeddingsEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: true
+      InstanceType: !Ref SLMInstanceType
+      ImageId: '{{resolve:ssm:/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-amazon-linux-2023/latest/ami-id}}'
+      SubnetId: !Ref PrivateSubnetInTheLocalZone
+      IamInstanceProfile: !Ref EC2SSMInstanceProfile
+      SecurityGroupIds: 
+        - !Ref SLMSecurityGroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref IMDSv2LaunchTemplate
+        Version: !GetAtt IMDSv2LaunchTemplate.DefaultVersionNumber
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda  # Root volume for Amazon Linux 2023
+          Ebs:
+            VolumeSize: 150  # Size in GB
+            VolumeType: gp2
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'SLM-Vector-Embeddings']]
+
+  #
+  # EC2 instance for the SLM
+  #
+  SLMSmolLm2EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: true
+      InstanceType: !Ref SLMInstanceType
+      ImageId: '{{resolve:ssm:/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-amazon-linux-2023/latest/ami-id}}'
+      SubnetId: !Ref PrivateSubnetInTheLocalZone
+      IamInstanceProfile: !Ref EC2SSMInstanceProfile
+      SecurityGroupIds:
+        - !Ref SLMSecurityGroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref IMDSv2LaunchTemplate
+        Version: !GetAtt IMDSv2LaunchTemplate.DefaultVersionNumber
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda  # Root volume for Amazon Linux 2023
+          Ebs:
+            VolumeSize: 200  # Size in GB
+            VolumeType: gp2
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'SLM-SmolLM2']]
+
+  #
+  # EC2 instance for the SLM
+  #
+  SLMMistral7BEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      DisableApiTermination: true
+      InstanceType: !Ref SLMInstanceType
+      ImageId: '{{resolve:ssm:/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-amazon-linux-2023/latest/ami-id}}'
+      SubnetId: !Ref PrivateSubnetInTheLocalZone
+      IamInstanceProfile: !Ref EC2SSMInstanceProfile
+      SecurityGroupIds:
+        - !Ref SLMSecurityGroup
+      LaunchTemplate:
+        LaunchTemplateId: !Ref IMDSv2LaunchTemplate
+        Version: !GetAtt IMDSv2LaunchTemplate.DefaultVersionNumber
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda  # Root volume for Amazon Linux 2023
+          Ebs:
+            VolumeSize: 200  # Size in GB
+            VolumeType: gp2
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!FindInMap [EnvironmentConfig, Project, Name], 'SLM-Mistral-7B']]

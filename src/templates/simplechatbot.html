@@ -1,0 +1,42 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>GenAI at the Edge on AWS Outposts - Chatbot
+    </title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/simplechatbot.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <h1 class="amazonember_lt-font">Generative AI at the Edge on AWS Outposts - Chatbot</h1>
+        </div>
+        <div class="chat-container">
+            <div class="chatbot">
+                <div class="model-selection">
+                    <h2>Model</h2>
+                    <select id="model-select" class="model-dropdown">
+                        <option value="Mistral">Mistral 7B</option>
+                        <option value="SmolLM2">SmolLM2 1.7B</option>
+                    </select>
+                </div>
+                <div class="chat-box">
+                    <textarea id="chat-output" readonly></textarea>
+                    <div id="metrics"></div>
+                </div>
+            </div>
+        </div>
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button class="action-button" id="send-button" onclick="generate()">Send</button>
+            <button class="clean-button" id="clear-button" onclick="clearChat()">Clear</button>
+        </div>
+    </div>
+    <script src="/static/scripts/simplechatbot.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+</body>
+</html>

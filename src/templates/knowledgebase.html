@@ -1,0 +1,29 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Knowledgebase at the Edge</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/knowledgebase.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <h1 class="amazonember_lt-font">GenAI at the Edge on AWS Outposts - Local Knowledgebase</h1>
+        </div>
+        <div class="upload-container" id="drop-zone">
+            <div class="amazonember_lt-font">
+                <p>Drag and drop your PDF file here</p>
+                <p>or</p>
+                <label for="file-input" class="action-button">Choose File</label>
+                <input type="file" id="file-input" accept=".pdf" hidden>
+            </div>
+        </div>
+        <div id="upload-status"></div>
+    </div>
+    <script src="/static/scripts/knowledgebase.js"></script>
+</body>
+</html>

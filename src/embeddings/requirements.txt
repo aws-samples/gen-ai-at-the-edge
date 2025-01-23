@@ -1,0 +1,8 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+Flask==3.1.0
+Flask-WTF==1.2.2
+gevent==24.11.1
+requests>=2.31.0
+sentence-transformers==3.3.1

@@ -1,0 +1,75 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <title>GenAI at the Edge on AWS Outposts - Two chatbots</title>
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/twochatbots.css') }}">
+    </head>
+    <body>
+        <div class="container">
+            <div class="header-container">
+                <h1 class="amazonember_lt-font">Generative AI at the Edge on AWS Outposts - Two chatbots</h1>
+            </div>
+            <div class="chat-container">
+                <div class="chatbot">
+                    <h2>Model: Mistral 7B</h2>
+                    <div class="chat-box">
+                        <textarea class="chat-output" id="chat-output-without-rag" readonly></textarea>
+                        <div id="metrics1" class="metrics"></div>
+                    </div>
+                </div>
+                <div class="chatbot">
+                    <h2>Model: SmolLM2 1.7B</h2>
+                    <div class="chat-box">
+                        <textarea class="chat-output" id="chat-output-with-rag" readonly></textarea>
+                        <div id="metrics2" class="metrics"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="input-container">
+                <input type="text" id="user-input" placeholder="Type your message...">
+                <button class="action-button" id="send-button">Send</button>
+                <button class="clean-button" id="clear-button">Clear</button>
+            </div>
+        </div>
+        <!-- Store the script path in a data attribute -->
+        <div id="script-config"
+             data-script-path="{{ url_for('static', filename='scripts/twochatbots.js') }}"
+             style="display: none;">
+        </div>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/json-stable-stringify@1.0.1/index.js"
+            integrity="sha384-SuR5eHqHe8E5oUQfGzH6bMjMIXgS4lreNqnQvGy2KlSv0wQ/DEWpGsKxhYNs7AHL"
+            crossorigin="anonymous"></script>
+        <!-- Script loader -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const scriptConfig = document.getElementById('script-config');
+                if (scriptConfig) {
+                    const scriptPath = scriptConfig.getAttribute('data-script-path');
+                    if (scriptPath) {
+                        // Validate the script path
+                        try {
+                            const url = new URL(scriptPath, window.location.origin);
+                            // Only allow scripts from the same origin
+                            if (url.origin === window.location.origin) {
+                                const script = document.createElement('script');
+                                script.src = url.href;
+                                script.async = true;
+                                document.body.appendChild(script);
+                            } else {
+                                console.error('Invalid script origin');
+                            }
+                        } catch (e) {
+                            console.error('Invalid script path:', e);
+                        }
+                    }
+                }
+            });
+        </script>
+    </body>
+</html>

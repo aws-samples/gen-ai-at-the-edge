@@ -1,0 +1,74 @@
+ Name                     Version      License                                             
+ CacheControl             0.14.2       Apache Software License                             
+ Flask                    3.1.0        BSD License                                         
+ Jinja2                   3.1.5        BSD License                                         
+ MarkupSafe               3.0.2        BSD License                                         
+ PyPDF2                   3.0.1        BSD License                                         
+ PyYAML                   6.0.2        MIT License                                         
+ Pygments                 2.19.1       BSD License                                         
+ Werkzeug                 3.1.3        BSD License                                         
+ bandit                   1.8.0        Apache Software License                             
+ black                    24.10.0      MIT License                                         
+ blinker                  1.9.0        MIT License                                         
+ boolean.py               4.0          BSD-2-Clause                                        
+ boto3                    1.35.97      Apache Software License                             
+ botocore                 1.35.97      Apache Software License                             
+ certifi                  2024.12.14   Mozilla Public License 2.0 (MPL 2.0)                
+ charset-normalizer       3.4.1        MIT License                                         
+ click                    8.1.8        BSD License                                         
+ cyclonedx-python-lib     7.6.2        Apache Software License                             
+ defusedxml               0.7.1        Python Software Foundation License                  
+ filelock                 3.16.1       The Unlicense (Unlicense)                           
+ fsspec                   2024.12.0    BSD License                                         
+ gevent                   24.11.1      MIT License                                         
+ greenlet                 3.1.1        MIT License                                         
+ html5lib                 1.1          MIT License                                         
+ huggingface-hub          0.27.1       Apache Software License                             
+ idna                     3.10         BSD License                                         
+ itsdangerous             2.2.0        BSD License                                         
+ jmespath                 1.0.1        MIT License                                         
+ joblib                   1.4.2        BSD License                                         
+ license-expression       30.4.0       Apache-2.0                                          
+ markdown-it-py           3.0.0        MIT License                                         
+ mdurl                    0.1.2        MIT License                                         
+ mpmath                   1.3.0        BSD License                                         
+ msgpack                  1.1.0        Apache Software License                             
+ mypy-extensions          1.0.0        MIT License                                         
+ networkx                 3.4.2        BSD License                                         
+ numpy                    2.2.1        BSD License                                         
+ packageurl-python        0.16.0       MIT License                                         
+ packaging                24.2         Apache Software License; BSD License                
+ pathspec                 0.12.1       Mozilla Public License 2.0 (MPL 2.0)                
+ pbr                      6.1.0        Apache Software License                             
+ pillow                   11.1.0       CMU License (MIT-CMU)                               
+ pip-api                  0.0.34       Apache Software License                             
+ pip-requirements-parser  32.0.1       MIT                                                 
+ pip_audit                2.7.3        Apache Software License                             
+ platformdirs             4.3.6        MIT License                                         
+ psycopg2-binary          2.9.10       GNU Library or Lesser General Public License (LGPL) 
+ py-serializable          1.1.2        Apache Software License                             
+ pyparsing                3.2.1        MIT License                                         
+ python-dateutil          2.9.0.post0  Apache Software License; BSD License                
+ regex                    2024.11.6    Apache Software License                             
+ requests                 2.32.3       Apache Software License                             
+ rich                     13.9.4       MIT License                                         
+ s3transfer               0.10.4       Apache Software License                             
+ safetensors              0.5.2        Apache Software License                             
+ scikit-learn             1.6.1        BSD License                                         
+ scipy                    1.15.1       BSD License                                         
+ sentence-transformers    3.3.1        Apache Software License                             
+ six                      1.17.0       MIT License                                         
+ sortedcontainers         2.4.0        Apache Software License                             
+ stevedore                5.4.0        Apache Software License                             
+ sympy                    1.13.1       BSD License                                         
+ threadpoolctl            3.5.0        BSD License                                         
+ tokenizers               0.21.0       Apache Software License                             
+ toml                     0.10.2       MIT License                                         
+ torch                    2.5.1        BSD License                                         
+ tqdm                     4.67.1       MIT License; Mozilla Public License 2.0 (MPL 2.0)   
+ transformers             4.48.0       Apache Software License                             
+ typing_extensions        4.12.2       Python Software Foundation License                  
+ urllib3                  2.3.0        MIT License                                         
+ webencodings             0.5.1        BSD License                                         
+ zope.event               5.0          Zope Public License                                 
+ zope.interface           7.2          Zope Public License                                 
